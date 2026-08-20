@@ -4,48 +4,41 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"net/http"
-	"github.com/jonestm9/economic-os/backend/internal/ingestion/bls"
 	"github.com/joho/godotenv"
+	"github.com/jonestm9/economic-os/backend/internal/clients/fred"
 )
 
 func main() {
-	err := godotenv.Load();
-	if err != nil {
-		log.Fatal("Error loading BLS API key")
-	}
-	apiKey := os.Getenv("BLS_API_KEY")
-
-	httpClient := &http.Client{}
-
-	blsClient := bls.NewClient(
-		httpClient,
-		apiKey,
-	)
-
-	// hardcoded response fetching unemployment data from 2026 and 2025
-	response, err := blsClient.FetchData(
-		[]string{"LNS14000000"},
-		"2025",
-		"2026",
-	)
-
-	if err != nil {
-		log.Fatal(err)
+	if err := godotenv.Load(); err != nil {
+		log.Printf("warning: .env file not loaded: %v", err)
 	}
 
+	fredAPIKey := os.Getenv("FRED_API_KEY")
+	if fredAPIKey == "" {
+		log.Fatal("FRED_API_KEY is not set")
+	}
 
-	for _, series := range response.Results.Series {
+	fredClient := fred.NewClient(fredAPIKey)
 
-		fmt.Println("Series:", series.SeriesID)
-
-		for _, observation := range series.Data {
-			fmt.Printf(
-				"%s %s: %s\n",
-				observation.Year,
-				observation.Period,
-				observation.Value,
-			)
+	var trackedReleases = []int{
+		10,
+		18,
+		50,
+		53,
+	}
+	
+	for _, releaseID := range trackedReleases {
+		release, err := fredClient.GetRelease(releaseID)
+		if err != nil {
+			log.Fatal(err)
 		}
+	
+		fmt.Printf(
+			"%d | %s | press release: %t | %s\n",
+			release.ID,
+			release.Name,
+			release.PressRelease,
+			release.Link,
+		)
 	}
 }
